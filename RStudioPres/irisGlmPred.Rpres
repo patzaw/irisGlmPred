@@ -1,0 +1,172 @@
+Simple GLM predictors of Iris species
+========================================================
+author: Patrice Godard
+date: `r Sys.Date()`
+
+<small>
+- Project in the frame of the coursera
+<a href="https://class.coursera.org/devdataprod-007">"Developing Data Products"</a>
+- The data product as such is available <a href="https://pgodard.shinyapps.io/irisGlmPred/">here</a>
+</small>
+
+Iris flower data set (Fisher's Iris data set)
+========================================================
+
+```{r ,echo=FALSE}
+data(iris)
+```
+
+<small>
+Information taken from <a href="http://en.wikipedia.org/wiki/Iris_flower_data_set">wikipedia</a>
+- A multivariate data set introduced by Sir Ronald Fisher (1936)
+- Edgar Anderson collected the data to quantify the morphologic variation of Iris flowers of three related species:
+  - Iris setosa (`r sum(iris$Species=="setosa")` samples)
+  - Iris virginica (`r sum(iris$Species=="virginica")` samples)
+  - Iris versicolor (`r sum(iris$Species=="versicolor")` samples)
+- Four features were measured from each sample, in centimetres (cm)
+  - Width and length of sepals
+  - Width and length of petals
+</small>
+
+Feature distribution
+========================================================
+
+```{r, echo=F}
+library(RColorBrewer)
+species <- sort(unique(iris$Species))
+specCol <- brewer.pal(n=length(species), name="Set3")
+names(specCol) <- species
+features <- setdiff(colnames(iris), "Species")
+featLabs <- gsub("[.]", " ", features)
+names(featLabs) <- features
+toPlot <- do.call(cbind,lapply(
+  features,
+  function(f){
+    toRet <- unstack(iris[,c(f, "Species")], formula(paste(f,"~ Species")))
+    names(toRet) <- paste(f, names(toRet), sep=".//.")
+    return(toRet)
+  }
+))
+toPlot.spec <- sub("^.*[.][/][/][.]", "", colnames(toPlot))
+toPlot.feat <- sub("[.][/][/][.].*$", "", colnames(toPlot))
+boxplot(
+  toPlot,
+  names=rep("", ncol(toPlot)),
+  col=specCol[toPlot.spec],
+  ylab="cm",
+  xaxt="n"
+)
+mtext(
+  side=1,
+  line=1,
+  at=seq(
+    (length(species)+1)/2,
+    ncol(toPlot)-((length(species)+1)/2)+1,
+    length.out=length(features)
+  ),
+  text=featLabs
+)
+abline(
+  v=(length(species)*(1:(length(features)-1)))+0.5
+)
+legend(
+  "topright",
+  legend=species,
+  pch=15,
+  col=specCol
+)
+```
+
+The aim of the project
+========================================================
+Assess the performance of simple generalized linear models (<acronym title="Generalized Linear Model">GLM</acronym>) based on a single feature using the following R function:
+```{r , echo=TRUE, eval=F}
+## feature %in% colnames(iris)
+glm(
+	formula = feature ~ Species,
+	data = iris,
+	family = binomial
+)
+```
+The glm call above uses the following logit link function:
+$$X\beta = ln\left(\frac{\mu}{1 - \mu}\right)$$
+
+Accuracy of the predictors
+========================================================
+```{r, echo=FALSE}
+pred.eff <- function(feature){
+	iris.models <- lapply(
+		species,
+		function(s){
+			tmp <- iris
+			tmp$cl <- tmp$Species==s
+			glm(
+				formula=formula(paste(
+					"cl ~ ",
+					'`', feature, '`',
+					sep=""
+				)),
+				data=tmp,
+				family=binomial
+			)
+		}
+	)
+	names(iris.models) <- species
+	iris.pred <- as.data.frame(do.call(cbind, lapply(
+		iris.models,
+		predict,
+		type="response"
+	)))
+	iris.pred$Spec.Pred <- apply(
+		iris.pred,
+		1,
+		function(x){
+			colnames(iris.pred)[which.max(x)]
+		}
+	)
+	iris.pred <- cbind(iris[,c("Species", feature), drop=F], iris.pred)
+	# print(feature)
+	accuracy <- unlist(lapply(
+		species,
+		function(x){
+			y <- iris.pred[which(iris.pred$Species==x),]
+			sum(y$Species==y$Spec.Pred)/nrow(y)
+		}
+	))
+	names(accuracy) <- species
+	return(list(accuracy=accuracy))
+	# print(table(iris.pred[, c("Species", "Spec.Pred")]))
+}
+```
+- Sepal length
+```{r, echo=FALSE}
+res <- pred.eff("Sepal.Length")
+```
+	- Iris setosa: `r round(res$accuracy["setosa"], digits=2)`
+	- Iris versicolor: `r round(res$accuracy["versicolor"], digits=2)`
+	- Iris virginica: `r round(res$accuracy["virginica"], digits=2)`
+		
+- Sepal width
+```{r, echo=FALSE}
+res <- pred.eff("Sepal.Width")
+```
+	- Iris setosa: `r round(res$accuracy["setosa"], digits=2)`
+	- Iris versicolor: `r round(res$accuracy["versicolor"], digits=2)`
+	- Iris virginica: `r round(res$accuracy["virginica"], digits=2)`
+		
+***
+- Petal length
+```{r, echo=FALSE}
+res <- pred.eff("Petal.Length")
+```
+	- Iris setosa: `r round(res$accuracy["setosa"], digits=2)`
+	- Iris versicolor: `r round(res$accuracy["versicolor"], digits=2)`
+	- Iris virginica: `r round(res$accuracy["virginica"], digits=2)`
+	
+- Petal width
+```{r, echo=FALSE}
+res <- pred.eff("Petal.Width")
+```
+	- Iris setosa: `r round(res$accuracy["setosa"], digits=2)`
+	- Iris versicolor: `r round(res$accuracy["versicolor"], digits=2)`
+	- Iris virginica: `r round(res$accuracy["virginica"], digits=2)`
